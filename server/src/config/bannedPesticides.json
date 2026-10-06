@@ -1,0 +1,38 @@
+{
+  "_comment": "Pesticides banned, refused registration, or severely restricted in India per CIB&RC (Central Insecticide Board & Registration Committee) Gazette notifications. Maintainers must re-verify against latest Directorate of Plant Protection, Quarantine & Storage (DPPQS) notifications.",
+  "banned": [
+    "aldrin",
+    "chlordane",
+    "ddt",
+    "dieldrin",
+    "endrin",
+    "endosulfan",
+    "heptachlor",
+    "lindane",
+    "methyl parathion",
+    "phosphamidon",
+    "dicofol",
+    "dinocap",
+    "methomyl",
+    "monocrotophos",
+    "carbofuran",
+    "phorate",
+    "triazophos",
+    "paraquat dichloride",
+    "chlorpyrifos"
+  ],
+  "restricted": [
+    {
+      "active_ingredient": "monocrotophos",
+      "restriction": "Prohibited on vegetables and certain horticulture crops"
+    },
+    {
+      "active_ingredient": "methyl parathion",
+      "restriction": "Banned for all agricultural use"
+    },
+    {
+      "active_ingredient": "endosulfan",
+      "restriction": "Total ban nationwide by Supreme Court of India order"
+    }
+  ]
+}

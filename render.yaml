@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: cropsage-backend
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build:server
+    startCommand: npm run start:server
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8080
+      - key: APP_VERSION
+        value: 1.0.0
+      - key: LOG_LEVEL
+        value: info
+      - key: CORS_ORIGINS
+        value: https://*.vercel.app,http://localhost:5173
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: crop-images
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL_TEXT
+        value: gemini-2.5-flash
+      - key: GEMINI_MODEL_VISION
+        value: gemini-2.5-flash
+      - key: GEMINI_MODEL_CHAT
+        value: gemini-2.5-flash
+      - key: OPEN_METEO_BASE_URL
+        value: https://api.open-meteo.com/v1/forecast
+      - key: WEATHER_CACHE_TTL_MINUTES
+        value: "30"
+      - key: AI_HOURLY_LIMIT_PER_USER
+        value: "20"
+      - key: AI_DAILY_QUOTA_PER_USER
+        value: "60"
+      - key: UPLOAD_DAILY_LIMIT_PER_USER
+        value: "30"
