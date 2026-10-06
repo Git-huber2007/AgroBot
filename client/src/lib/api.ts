@@ -109,6 +109,7 @@ async function request<T>(
           currentPath.startsWith('/verify-email');
 
         if (!isPublicAuthPage) {
+          supabase.auth.signOut().catch(() => {});
           const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
           window.location.href = `/login?returnTo=${returnTo}`;
         }
