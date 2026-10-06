@@ -20,7 +20,7 @@
     "db:migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
-    "typescript": "^5.7.3"
+    "typescript": "^7.0.2"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
