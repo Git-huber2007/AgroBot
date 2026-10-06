@@ -18,13 +18,25 @@ const EnvSchema = z.object({
   APP_VERSION: z.string().default('1.0.0'),
 
   // Supabase
-  SUPABASE_URL: z.string().url('SUPABASE_URL must be a valid URL (e.g. https://your-project.supabase.co)').default('https://example.supabase.co'),
-  SUPABASE_ANON_KEY: z.string().min(1, 'SUPABASE_ANON_KEY is required').default('dummy-anon-key-for-tests'),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY is required').default('dummy-service-role-key-for-tests'),
+  SUPABASE_URL: z.preprocess(
+    v => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined),
+    z.string().url('SUPABASE_URL must be a valid URL (e.g. https://your-project.supabase.co)').default('https://example.supabase.co'),
+  ),
+  SUPABASE_ANON_KEY: z.preprocess(
+    v => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined),
+    z.string().min(1, 'SUPABASE_ANON_KEY is required').default('dummy-anon-key-for-tests'),
+  ),
+  SUPABASE_SERVICE_ROLE_KEY: z.preprocess(
+    v => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined),
+    z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY is required').default('dummy-service-role-key-for-tests'),
+  ),
   SUPABASE_STORAGE_BUCKET: z.string().default('crop-images'),
 
   // Google Gemini
-  GEMINI_API_KEY: z.string().default('dummy-gemini-key-for-mock-or-test'),
+  GEMINI_API_KEY: z.preprocess(
+    v => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined),
+    z.string().default('dummy-gemini-key-for-mock-or-test'),
+  ),
   GEMINI_MODEL_TEXT: z.string().default('gemini-2.5-flash'),
   GEMINI_MODEL_VISION: z.string().default('gemini-2.5-flash'),
   GEMINI_MODEL_CHAT: z.string().default('gemini-2.5-flash'),

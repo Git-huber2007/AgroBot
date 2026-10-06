@@ -4,10 +4,10 @@ import { logger } from './utils/logger.js';
 
 const app = createApp();
 
-const server = app.listen(env.PORT, () => {
+const server = app.listen(env.PORT, '0.0.0.0', () => {
   logger.info(
     { port: env.PORT, env: env.NODE_ENV, version: env.APP_VERSION },
-    `🌾 CropSage AI server listening on port ${env.PORT}`,
+    `🌾 CropSage AI server listening on port ${env.PORT} (0.0.0.0)`,
   );
 });
 
