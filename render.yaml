@@ -18,7 +18,7 @@ services:
       - key: LOG_LEVEL
         value: info
       - key: CORS_ORIGINS
-        value: https://*.vercel.app,http://localhost:5173
+        value: https://agrobot-three-rho.vercel.app,https://*.vercel.app,http://localhost:5173
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY

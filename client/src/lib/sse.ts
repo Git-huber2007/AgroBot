@@ -6,7 +6,10 @@ export interface SSECallbacks {
   onError?: (error: Error) => void;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+const rawApiUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1').trim();
+const API_BASE_URL = rawApiUrl.endsWith('/api/v1')
+  ? rawApiUrl
+  : `${rawApiUrl.replace(/\/+$/, '')}/api/v1`;
 
 export async function postSSEStream(
   path: string,
