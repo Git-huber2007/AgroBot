@@ -26,10 +26,15 @@ chatRouter.get('/chat/sessions', requireAuth, async (req, res, next) => {
       throw new Error(`Failed to list chat sessions: ${error.message}`);
     }
 
-    const mapped = (sessions || []).map(s => ({
-      ...s,
-      farm_name: s.farms?.name,
-    }));
+    const mapped = (sessions || []).map(s => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const farmObj = (Array.isArray(s.farms) ? s.farms[0] : s.farms) as any;
+      return {
+        ...s,
+        farm: farmObj || null,
+        farm_name: farmObj?.name || null,
+      };
+    });
 
     res.json({ data: mapped });
   } catch (err) {

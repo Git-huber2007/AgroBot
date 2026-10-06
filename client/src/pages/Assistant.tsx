@@ -131,9 +131,9 @@ export const Assistant: React.FC = () => {
                   <h4 className="text-sm font-bold text-stone-900 truncate">{session.title}</h4>
                   <p className="text-xs text-stone-500 mt-0.5 flex items-center gap-2">
                     <span>{formatDateTime(session.updated_at)}</span>
-                    {session.farm?.name && (
+                    {(session.farm?.name || (session as any).farm_name) && (
                       <span className="text-leaf-700 font-medium truncate">
-                        • {session.farm.name}
+                        • {session.farm?.name || (session as any).farm_name}
                       </span>
                     )}
                   </p>

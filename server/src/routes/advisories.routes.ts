@@ -40,7 +40,7 @@ advisoriesRouter.get(
     try {
       const { data: advisory, error } = await req.supabase!
         .from('crop_advisories')
-        .select('*, crops(name_en), farms(name)')
+        .select('*, crops(name_en, name_hi), farms(name, district, state, area_hectares)')
         .eq('id', req.params.id)
         .maybeSingle();
 
@@ -48,11 +48,18 @@ advisoriesRouter.get(
         throw new NotFoundError('Crop advisory not found.');
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const farmObj = (Array.isArray(advisory.farms) ? advisory.farms[0] : advisory.farms) as any;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cropObj = (Array.isArray(advisory.crops) ? advisory.crops[0] : advisory.crops) as any;
+
       res.json({
         data: {
           ...advisory,
-          farm_name: advisory.farms?.name,
-          crop_name: advisory.crops?.name_en,
+          farm: farmObj,
+          crop: cropObj,
+          farm_name: farmObj?.name,
+          crop_name: cropObj?.name_en,
         },
       });
     } catch (err) {

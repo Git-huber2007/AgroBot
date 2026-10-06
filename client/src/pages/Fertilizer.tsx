@@ -77,9 +77,18 @@ export const Fertilizer: React.FC = () => {
   };
 
   const onSubmit = async (data: FertilizerRequestInput) => {
+    const targetFarmId = activeFarm?.id || data.farm_id;
+    if (!targetFarmId) {
+      error('Please select an active farm plot before generating a fertilizer plan.');
+      return;
+    }
+
     setIsCalculating(true);
     try {
-      const res = await api.post<{ id: string }>('/fertilizer-plans', data);
+      const res = await api.post<{ id: string }>('/fertilizer-plans', {
+        ...data,
+        farm_id: targetFarmId,
+      });
       navigate(`/fertilizer/${res.id}`);
     } catch (err: any) {
       setIsCalculating(false);

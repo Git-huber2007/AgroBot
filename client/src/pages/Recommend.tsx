@@ -68,10 +68,28 @@ export const Recommend: React.FC = () => {
     },
   });
 
+  React.useEffect(() => {
+    if (activeFarm) {
+      setValue('farm_id', activeFarm.id);
+      if (activeFarm.water_availability) {
+        setValue('water_availability', activeFarm.water_availability as any);
+      }
+    }
+  }, [activeFarm, setValue]);
+
   const onSubmit = async (data: RecommendationRequestInput) => {
+    const targetFarmId = activeFarm?.id || data.farm_id;
+    if (!targetFarmId) {
+      error('Please select an active farm plot before generating crop recommendations.');
+      return;
+    }
+
     setIsGenerating(true);
     try {
-      const res = await api.post<{ id: string }>('/recommendations', data);
+      const res = await api.post<{ id: string }>('/recommendations', {
+        ...data,
+        farm_id: targetFarmId,
+      });
       navigate(`/recommend/${res.id}`);
     } catch (err: any) {
       setIsGenerating(false);

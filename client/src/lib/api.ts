@@ -94,10 +94,21 @@ async function request<T>(
     const requestId = errorPayload.requestId;
 
     if (response.status === 401) {
-      // If we are not on public auth pages, we could redirect or notify
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/signup') && window.location.pathname !== '/') {
-        const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
-        window.location.href = `/login?returnTo=${returnTo}`;
+      // If we are not on public auth pages, redirect to login
+      if (typeof window !== 'undefined') {
+        const currentPath = window.location.pathname;
+        const isPublicAuthPage =
+          currentPath === '/' ||
+          currentPath.startsWith('/login') ||
+          currentPath.startsWith('/signup') ||
+          currentPath.startsWith('/forgot-password') ||
+          currentPath.startsWith('/reset-password') ||
+          currentPath.startsWith('/verify-email');
+
+        if (!isPublicAuthPage) {
+          const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+          window.location.href = `/login?returnTo=${returnTo}`;
+        }
       }
     }
 
@@ -111,5 +122,5 @@ export const api = {
   get: <T>(path: string, options?: RequestOptions) => request<T>('GET', path, undefined, options),
   post: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('POST', path, body, options),
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PATCH', path, body, options),
-  delete: <T>(path: string, options?: RequestOptions) => request<T>('DELETE', path, undefined, options),
+  delete: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('DELETE', path, body, options),
 };

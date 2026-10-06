@@ -102,23 +102,36 @@ export const DiagnosisResultView: React.FC<{
         </div>
       </div>
 
-      {/* Image Gallery */}
+      {/* Uploaded Photos Gallery */}
       {diagnosis.signed_images && diagnosis.signed_images.length > 0 && (
-        <div className="flex gap-3 overflow-x-auto pb-2">
-          {diagnosis.signed_images.map((url, idx) => (
-            <div
-              key={idx}
-              className="relative w-36 h-36 sm:w-44 sm:h-44 rounded-xl overflow-hidden border border-stone-200 shadow-sm shrink-0 bg-stone-100"
-            >
-              <img
-                src={url}
-                alt={`Sample photo ${idx + 1}`}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          ))}
-        </div>
+        <Card className="p-4 bg-white/80 border-stone-200 space-y-2">
+          <h4 className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center gap-1.5">
+            <Camera className="w-3.5 h-3.5 text-leaf-600" />
+            Analyzed Photos ({diagnosis.signed_images.length})
+          </h4>
+          <div className="flex flex-wrap gap-3 pt-1">
+            {diagnosis.signed_images.map((imgUrl, idx) => (
+              <a
+                key={idx}
+                href={imgUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden border border-stone-200 shadow-xs bg-stone-100 hover:ring-2 hover:ring-leaf-500 transition-all group"
+              >
+                <img
+                  src={imgUrl}
+                  alt={`Plant photo ${idx + 1}`}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+                <span className="absolute bottom-1 right-1 bg-stone-900/70 text-white text-[10px] font-medium px-1.5 py-0.5 rounded backdrop-blur-xs">
+                  Photo {idx + 1}
+                </span>
+              </a>
+            ))}
+          </div>
+        </Card>
       )}
+
 
       {/* Low Confidence State */}
       {isLowConfidence ? (

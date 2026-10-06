@@ -55,10 +55,25 @@ export const AdvisoryNew: React.FC = () => {
   const watchSowingDate = watch('sowing_date');
   const watchGrowthStage = watch('growth_stage');
 
+  React.useEffect(() => {
+    if (activeFarm?.id) {
+      setValue('farm_id', activeFarm.id);
+    }
+  }, [activeFarm?.id, setValue]);
+
   const onSubmit = async (data: AdvisoryRequestInput) => {
+    const targetFarmId = activeFarm?.id || data.farm_id;
+    if (!targetFarmId) {
+      error('Please select an active farm plot before generating an advisory.');
+      return;
+    }
+
     setIsGenerating(true);
     try {
-      const response = await api.post<{ id: string }>('/advisories', data);
+      const response = await api.post<{ id: string }>('/advisories', {
+        ...data,
+        farm_id: targetFarmId,
+      });
       navigate(`/advisory/${response.id}`);
     } catch (err: any) {
       setIsGenerating(false);

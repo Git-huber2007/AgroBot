@@ -40,7 +40,7 @@ recommendationsRouter.get(
     try {
       const { data: rec, error } = await req.supabase!
         .from('crop_recommendations')
-        .select('*, farms(name)')
+        .select('*, farms(name, district, state, area_hectares)')
         .eq('id', req.params.id)
         .maybeSingle();
 
@@ -48,10 +48,14 @@ recommendationsRouter.get(
         throw new NotFoundError('Crop recommendation not found.');
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const farmObj = (Array.isArray(rec.farms) ? rec.farms[0] : rec.farms) as any;
+
       res.json({
         data: {
           ...rec,
-          farm_name: rec.farms?.name,
+          farm: farmObj,
+          farm_name: farmObj?.name,
         },
       });
     } catch (err) {

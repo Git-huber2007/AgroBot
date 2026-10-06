@@ -40,7 +40,7 @@ fertilizerRouter.get(
     try {
       const { data: plan, error } = await req.supabase!
         .from('fertilizer_plans')
-        .select('*, crops(name_en), farms(name)')
+        .select('*, crops(name_en, name_hi), farms(name, district, state, area_hectares)')
         .eq('id', req.params.id)
         .maybeSingle();
 
@@ -48,11 +48,18 @@ fertilizerRouter.get(
         throw new NotFoundError('Fertilizer plan not found.');
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const farmObj = (Array.isArray(plan.farms) ? plan.farms[0] : plan.farms) as any;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cropObj = (Array.isArray(plan.crops) ? plan.crops[0] : plan.crops) as any;
+
       res.json({
         data: {
           ...plan,
-          farm_name: plan.farms?.name,
-          crop_name: plan.crops?.name_en,
+          farm: farmObj,
+          crop: cropObj,
+          farm_name: farmObj?.name,
+          crop_name: cropObj?.name_en,
         },
       });
     } catch (err) {

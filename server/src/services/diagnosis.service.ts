@@ -239,10 +239,14 @@ export class DiagnosisService {
         });
       }
 
+      const signedUrls = signedImages.map(img => img.signed_url).filter(Boolean) as string[];
+
       return {
         ...savedDiag,
+        crop: { name_en: crop.name_en, name_hi: crop.name_hi },
         crop_name: crop.name_en,
         images: signedImages,
+        signed_images: signedUrls,
       };
     } catch (err) {
       // Compensating cleanup on failure (§15.3)
@@ -257,7 +261,7 @@ export class DiagnosisService {
   public static async getDiagnosisById(userClient: SupabaseClient, id: string) {
     const { data: diag, error: diagErr } = await userClient
       .from('pest_diagnoses')
-      .select('*, crops(name_en), farms(name)')
+      .select('*, crops(name_en, name_hi), farms(name, district, state)')
       .eq('id', id)
       .maybeSingle();
 
@@ -277,9 +281,20 @@ export class DiagnosisService {
       })),
     );
 
+    const signedUrls = signedImages.map(img => img.signed_url).filter(Boolean) as string[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const farmObj = (Array.isArray(diag.farms) ? diag.farms[0] : diag.farms) as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cropObj = (Array.isArray(diag.crops) ? diag.crops[0] : diag.crops) as any;
+
     return {
       ...diag,
+      farm: farmObj,
+      crop: cropObj,
+      farm_name: farmObj?.name,
+      crop_name: cropObj?.name_en,
       images: signedImages,
+      signed_images: signedUrls,
     };
   }
 }

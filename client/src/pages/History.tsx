@@ -61,8 +61,8 @@ export const History: React.FC = () => {
       }),
   });
 
-  const items = data?.items || [];
-  const total = data?.total || 0;
+  const items = Array.isArray(data) ? data : data?.items || [];
+  const total = Array.isArray(data) ? data.length : data?.total || 0;
   const totalPages = Math.ceil(total / 20) || 1;
 
   const getRecordLink = (type: string, id: string) => {

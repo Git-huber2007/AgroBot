@@ -106,7 +106,13 @@ historyRouter.get(
       const totalPages = Math.ceil(total / pageSize);
 
       res.json({
-        data: enriched,
+        data: {
+          items: enriched,
+          total,
+          totalPages,
+          page,
+          pageSize,
+        },
         meta: {
           page,
           pageSize,

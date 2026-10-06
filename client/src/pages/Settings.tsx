@@ -104,11 +104,7 @@ export const Settings: React.FC = () => {
 
     setIsDeletingAccount(true);
     try {
-      await api.delete('/me', {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      await api.delete('/me', { password: deletePassword });
       await signOut();
       success('Your account and all associated farm data have been permanently removed.');
       navigate('/');

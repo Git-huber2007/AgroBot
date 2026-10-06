@@ -6,16 +6,31 @@ import { authSensitiveLimiter } from '../middleware/rateLimiters.js';
 import { AccountService } from '../services/account.service.js';
 import { NotFoundError, ValidationError } from '../utils/errors.js';
 
+import { supabaseAdmin } from '../db/adminClient.js';
+
 export const meRouter = Router();
 
 // GET /me
 meRouter.get('/me', requireAuth, async (req, res, next) => {
   try {
-    const { data: profile, error } = await req.supabase!
+    let { data: profile, error } = await req.supabase!
       .from('profiles')
       .select('*')
       .eq('id', req.user!.id)
       .maybeSingle();
+
+    if (!profile) {
+      // Lazy auto-create with admin client if trigger has not executed
+      const { data: created, error: createErr } = await supabaseAdmin
+        .from('profiles')
+        .insert({ id: req.user!.id })
+        .select('*')
+        .maybeSingle();
+
+      if (!createErr && created) {
+        profile = created;
+      }
+    }
 
     if (error || !profile) {
       throw new NotFoundError('User profile not found.');

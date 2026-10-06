@@ -55,7 +55,7 @@ export const Dashboard: React.FC = () => {
     queryFn: () => api.get('/history', { params: { pageSize: 5 } }),
   });
 
-  const recentItems = historyData?.items || [];
+  const recentItems = Array.isArray(historyData) ? historyData : historyData?.items || [];
 
   const getRecordTypeBadge = (type: string) => {
     switch (type) {

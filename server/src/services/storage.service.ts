@@ -77,13 +77,30 @@ export class StorageService {
    */
   public static async deleteUserFolder(userId: string): Promise<void> {
     try {
-      const { data: files } = await supabaseAdmin.storage
+      const { data: items } = await supabaseAdmin.storage
         .from(env.SUPABASE_STORAGE_BUCKET)
         .list(userId);
 
-      if (files && files.length > 0) {
-        const fullPaths = files.map(f => `${userId}/${f.name}`);
-        await supabaseAdmin.storage.from(env.SUPABASE_STORAGE_BUCKET).remove(fullPaths);
+      if (items && items.length > 0) {
+        const fullPaths: string[] = [];
+        for (const item of items) {
+          if (item.id) {
+            fullPaths.push(`${userId}/${item.name}`);
+          } else {
+            // Nested subfolder (e.g. diagnosisId)
+            const { data: subFiles } = await supabaseAdmin.storage
+              .from(env.SUPABASE_STORAGE_BUCKET)
+              .list(`${userId}/${item.name}`);
+            if (subFiles && subFiles.length > 0) {
+              for (const sub of subFiles) {
+                fullPaths.push(`${userId}/${item.name}/${sub.name}`);
+              }
+            }
+          }
+        }
+        if (fullPaths.length > 0) {
+          await supabaseAdmin.storage.from(env.SUPABASE_STORAGE_BUCKET).remove(fullPaths);
+        }
       }
     } catch (err) {
       logger.warn({ userId, err }, 'Failed to delete user storage folder on account deletion');
