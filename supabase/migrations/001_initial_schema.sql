@@ -5,20 +5,71 @@
 
 create extension if not exists "pgcrypto";
 
--- ---------- ENUMS ----------
-create type app_language      as enum ('en','hi','kn','mr','ta','te','bn','gu','pa');
-create type crop_category     as enum ('cereal','pulse','oilseed','vegetable','fruit','spice','fibre','sugar','plantation','fodder','flower','medicinal');
-create type soil_type         as enum ('alluvial','black_cotton','red','laterite','sandy','loamy','clay','saline_alkaline','forest_mountain','desert','unknown');
-create type irrigation_source as enum ('rainfed','canal','borewell','open_well','tank_pond','river_lift','drip','sprinkler');
-create type season            as enum ('kharif','rabi','zaid','perennial');
-create type water_level       as enum ('scarce','moderate','adequate');
-create type farming_practice  as enum ('conventional','organic','natural');
-create type area_unit         as enum ('acre','hectare','bigha','guntha');
-create type record_type       as enum ('crop_advisory','crop_recommendation','pest_diagnosis','fertilizer_plan');
-create type affected_part     as enum ('leaf','stem','root','fruit','flower','seed','whole_plant');
-create type ai_feature        as enum ('crop_advisory','crop_recommendation','pest_diagnosis','fertilizer_plan','chat');
-create type ai_status         as enum ('success','schema_error','api_error','timeout','blocked','quota_exceeded');
-create type chat_role         as enum ('user','model');
+-- ---------- ENUMS (Safe Idempotent Creation) ----------
+do $$ begin
+  create type app_language as enum ('en','hi','kn','mr','ta','te','bn','gu','pa');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type crop_category as enum ('cereal','pulse','oilseed','vegetable','fruit','spice','fibre','sugar','plantation','fodder','flower','medicinal');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type soil_type as enum ('alluvial','black_cotton','red','laterite','sandy','loamy','clay','saline_alkaline','forest_mountain','desert','unknown');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type irrigation_source as enum ('rainfed','canal','borewell','open_well','tank_pond','river_lift','drip','sprinkler');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type season as enum ('kharif','rabi','zaid','perennial');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type water_level as enum ('scarce','moderate','adequate');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type farming_practice as enum ('conventional','organic','natural');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type area_unit as enum ('acre','hectare','bigha','guntha');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type record_type as enum ('crop_advisory','crop_recommendation','pest_diagnosis','fertilizer_plan');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type affected_part as enum ('leaf','stem','root','fruit','flower','seed','whole_plant');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type ai_feature as enum ('crop_advisory','crop_recommendation','pest_diagnosis','fertilizer_plan','chat');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type ai_status as enum ('success','schema_error','api_error','timeout','blocked','quota_exceeded');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type chat_role as enum ('user','model');
+exception when duplicate_object then null;
+end $$;
 
 -- ---------- UTILITIES ----------
 create or replace function public.set_updated_at()
@@ -29,7 +80,7 @@ begin
 end $$;
 
 -- ---------- PROFILES ----------
-create table public.profiles (
+create table if not exists public.profiles (
   id                    uuid primary key references auth.users(id) on delete cascade,
   full_name             text check (full_name is null or char_length(full_name) between 2 and 80),
   phone                 text check (phone is null or phone ~ '^\+?[0-9]{10,13}$'),
@@ -40,6 +91,8 @@ create table public.profiles (
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now()
 );
+
+drop trigger if exists trg_profiles_updated on public.profiles;
 create trigger trg_profiles_updated before update on public.profiles
   for each row execute function public.set_updated_at();
 
@@ -50,11 +103,16 @@ begin
   insert into public.profiles (id) values (new.id) on conflict do nothing;
   return new;
 end $$;
-create trigger on_auth_user_created after insert on auth.users
-  for each row execute function public.handle_new_user();
+
+do $$ begin
+  drop trigger if exists on_auth_user_created on auth.users;
+  create trigger on_auth_user_created after insert on auth.users
+    for each row execute function public.handle_new_user();
+exception when others then null;
+end $$;
 
 -- ---------- CROP CATALOG (public reference data) ----------
-create table public.crops (
+create table if not exists public.crops (
   id                        integer generated always as identity primary key,
   name_en                   text not null unique,
   name_hi                   text not null,
@@ -63,15 +121,15 @@ create table public.crops (
   seasons                   season[] not null,
   duration_days_min         integer not null check (duration_days_min > 0),
   duration_days_max         integer not null check (duration_days_max >= duration_days_min),
-  growth_stages             jsonb not null,  -- [{key,label_en,day_start,day_end}]
+  growth_stages             jsonb not null,
   water_requirement         water_level not null,
-  npk_recommendation_kg_ha  jsonb not null,  -- {"N":120,"P2O5":60,"K2O":40}
+  npk_recommendation_kg_ha  jsonb not null,
   is_active                 boolean not null default true,
   created_at                timestamptz not null default now()
 );
 
 -- ---------- FARMS ----------
-create table public.farms (
+create table if not exists public.farms (
   id                  uuid primary key default gen_random_uuid(),
   user_id             uuid not null references auth.users(id) on delete cascade,
   name                text not null check (char_length(name) between 2 and 60),
@@ -98,13 +156,15 @@ create table public.farms (
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now()
 );
-create index idx_farms_user on public.farms(user_id);
-create unique index uq_farms_one_default on public.farms(user_id) where is_default;
+create index if not exists idx_farms_user on public.farms(user_id);
+create unique index if not exists uq_farms_one_default on public.farms(user_id) where is_default;
+
+drop trigger if exists trg_farms_updated on public.farms;
 create trigger trg_farms_updated before update on public.farms
   for each row execute function public.set_updated_at();
 
 -- ---------- CROP ADVISORIES ----------
-create table public.crop_advisories (
+create table if not exists public.crop_advisories (
   id              uuid primary key default gen_random_uuid(),
   user_id         uuid not null references auth.users(id) on delete cascade,
   farm_id         uuid not null references public.farms(id) on delete cascade,
@@ -115,16 +175,16 @@ create table public.crop_advisories (
   season          season not null,
   concern         text check (concern is null or char_length(concern) <= 500),
   language        app_language not null,
-  weather_snapshot jsonb,            -- summarized forecast used in prompt
-  result          jsonb not null,    -- validated AI output
+  weather_snapshot jsonb,
+  result          jsonb not null,
   model           text not null,
   prompt_version  text not null,
   created_at      timestamptz not null default now()
 );
-create index idx_adv_user_created on public.crop_advisories(user_id, created_at desc);
+create index if not exists idx_adv_user_created on public.crop_advisories(user_id, created_at desc);
 
 -- ---------- CROP RECOMMENDATIONS ----------
-create table public.crop_recommendations (
+create table if not exists public.crop_recommendations (
   id                       uuid primary key default gen_random_uuid(),
   user_id                  uuid not null references auth.users(id) on delete cascade,
   farm_id                  uuid not null references public.farms(id) on delete cascade,
@@ -142,10 +202,10 @@ create table public.crop_recommendations (
   prompt_version           text not null,
   created_at               timestamptz not null default now()
 );
-create index idx_rec_user_created on public.crop_recommendations(user_id, created_at desc);
+create index if not exists idx_rec_user_created on public.crop_recommendations(user_id, created_at desc);
 
 -- ---------- PEST / DISEASE DIAGNOSES ----------
-create table public.pest_diagnoses (
+create table if not exists public.pest_diagnoses (
   id              uuid primary key default gen_random_uuid(),
   user_id         uuid not null references auth.users(id) on delete cascade,
   farm_id         uuid references public.farms(id) on delete set null,
@@ -159,40 +219,40 @@ create table public.pest_diagnoses (
   prompt_version  text not null,
   created_at      timestamptz not null default now()
 );
-create index idx_diag_user_created on public.pest_diagnoses(user_id, created_at desc);
+create index if not exists idx_diag_user_created on public.pest_diagnoses(user_id, created_at desc);
 
-create table public.diagnosis_images (
+create table if not exists public.diagnosis_images (
   id            uuid primary key default gen_random_uuid(),
   diagnosis_id  uuid not null references public.pest_diagnoses(id) on delete cascade,
   user_id       uuid not null references auth.users(id) on delete cascade,
-  storage_path  text not null unique,   -- {user_id}/{diagnosis_id}/{n}.{ext}
+  storage_path  text not null unique,
   mime_type     text not null check (mime_type in ('image/jpeg','image/png','image/webp')),
   size_bytes    integer not null check (size_bytes between 1 and 5242880),
   created_at    timestamptz not null default now(),
   constraint chk_path_owner check (split_part(storage_path,'/',1) = user_id::text)
 );
-create index idx_diagimg_diag on public.diagnosis_images(diagnosis_id);
+create index if not exists idx_diagimg_diag on public.diagnosis_images(diagnosis_id);
 
 -- ---------- FERTILIZER PLANS ----------
-create table public.fertilizer_plans (
+create table if not exists public.fertilizer_plans (
   id                     uuid primary key default gen_random_uuid(),
   user_id                uuid not null references auth.users(id) on delete cascade,
   farm_id                uuid not null references public.farms(id) on delete cascade,
   crop_id                integer not null references public.crops(id),
   area_hectares          numeric(10,4) not null check (area_hectares > 0),
   target_yield_t_ha      numeric(6,2),
-  inputs                 jsonb not null,  -- soil values + selected fertilizers
-  computed_quantities    jsonb not null,  -- deterministic calculator output
-  ai_schedule            jsonb not null,  -- validated AI output
+  inputs                 jsonb not null,
+  computed_quantities    jsonb not null,
+  ai_schedule            jsonb not null,
   language               app_language not null,
   model                  text not null,
   prompt_version         text not null,
   created_at             timestamptz not null default now()
 );
-create index idx_fert_user_created on public.fertilizer_plans(user_id, created_at desc);
+create index if not exists idx_fert_user_created on public.fertilizer_plans(user_id, created_at desc);
 
 -- ---------- CHAT ----------
-create table public.chat_sessions (
+create table if not exists public.chat_sessions (
   id               uuid primary key default gen_random_uuid(),
   user_id          uuid not null references auth.users(id) on delete cascade,
   farm_id          uuid references public.farms(id) on delete set null,
@@ -202,11 +262,13 @@ create table public.chat_sessions (
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );
-create index idx_chat_sessions_user on public.chat_sessions(user_id, updated_at desc);
+create index if not exists idx_chat_sessions_user on public.chat_sessions(user_id, updated_at desc);
+
+drop trigger if exists trg_chat_sessions_updated on public.chat_sessions;
 create trigger trg_chat_sessions_updated before update on public.chat_sessions
   for each row execute function public.set_updated_at();
 
-create table public.chat_messages (
+create table if not exists public.chat_messages (
   id          bigint generated always as identity primary key,
   session_id  uuid not null references public.chat_sessions(id) on delete cascade,
   user_id     uuid not null references auth.users(id) on delete cascade,
@@ -214,10 +276,10 @@ create table public.chat_messages (
   content     text not null check (char_length(content) between 1 and 8000),
   created_at  timestamptz not null default now()
 );
-create index idx_chat_messages_session on public.chat_messages(session_id, created_at);
+create index if not exists idx_chat_messages_session on public.chat_messages(session_id, created_at);
 
 -- ---------- FEEDBACK ----------
-create table public.feedback (
+create table if not exists public.feedback (
   id           uuid primary key default gen_random_uuid(),
   user_id      uuid not null references auth.users(id) on delete cascade,
   record_type  record_type not null,
@@ -228,8 +290,8 @@ create table public.feedback (
   unique (user_id, record_type, record_id)
 );
 
--- ---------- AI USAGE LOGS (server writes via service role) ----------
-create table public.ai_usage_logs (
+-- ---------- AI USAGE LOGS ----------
+create table if not exists public.ai_usage_logs (
   id                 bigint generated always as identity primary key,
   user_id            uuid references auth.users(id) on delete set null,
   feature            ai_feature not null,
@@ -242,16 +304,17 @@ create table public.ai_usage_logs (
   request_id         text,
   created_at         timestamptz not null default now()
 );
-create index idx_ai_logs_user_day on public.ai_usage_logs(user_id, created_at desc);
+create index if not exists idx_ai_logs_user_day on public.ai_usage_logs(user_id, created_at desc);
 
--- ---------- WEATHER CACHE (server-only) ----------
-create table public.weather_cache (
-  cache_key   text primary key,   -- "lat2,lng2"
+-- ---------- WEATHER CACHE ----------
+create table if not exists public.weather_cache (
+  cache_key   text primary key,
   payload     jsonb not null,
   fetched_at  timestamptz not null default now()
 );
 
 -- ---------- UNIFIED HISTORY VIEW ----------
+drop view if exists public.history_items;
 create or replace view public.history_items with (security_invoker = true) as
   select a.id, 'crop_advisory'::record_type as record_type, a.user_id, a.farm_id, a.crop_id,
          a.result->>'summary' as title_hint, a.created_at
@@ -284,40 +347,54 @@ grant execute on function public.set_default_farm(uuid) to authenticated;
 -- =====================================================================
 -- STORAGE BUCKETS
 -- =====================================================================
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('crop-images', 'crop-images', false, 5242880, array['image/jpeg','image/png','image/webp'])
-on conflict (id) do nothing;
+do $$ begin
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('crop-images', 'crop-images', false, 5242880, array['image/jpeg','image/png','image/webp'])
+  on conflict (id) do nothing;
+exception when others then null;
+end $$;
 
 -- =====================================================================
 -- ROW LEVEL SECURITY (RLS)
 -- =====================================================================
-alter table public.profiles             enable row level security;
-alter table public.crops                enable row level security;
-alter table public.farms                enable row level security;
-alter table public.crop_advisories      enable row level security;
-alter table public.crop_recommendations enable row level security;
-alter table public.pest_diagnoses       enable row level security;
-alter table public.diagnosis_images     enable row level security;
-alter table public.fertilizer_plans     enable row level security;
-alter table public.chat_sessions        enable row level security;
-alter table public.chat_messages        enable row level security;
-alter table public.feedback             enable row level security;
-alter table public.ai_usage_logs        enable row level security;
-alter table public.weather_cache        enable row level security;
+alter table if exists public.profiles             enable row level security;
+alter table if exists public.crops                enable row level security;
+alter table if exists public.farms                enable row level security;
+alter table if exists public.crop_advisories      enable row level security;
+alter table if exists public.crop_recommendations enable row level security;
+alter table if exists public.pest_diagnoses       enable row level security;
+alter table if exists public.diagnosis_images     enable row level security;
+alter table if exists public.fertilizer_plans     enable row level security;
+alter table if exists public.chat_sessions        enable row level security;
+alter table if exists public.chat_messages        enable row level security;
+alter table if exists public.feedback             enable row level security;
+alter table if exists public.ai_usage_logs        enable row level security;
+alter table if exists public.weather_cache        enable row level security;
 
 -- PROFILES
+drop policy if exists profiles_select_own on public.profiles;
 create policy profiles_select_own on public.profiles for select to authenticated using (id = auth.uid());
+
+drop policy if exists profiles_update_own on public.profiles;
 create policy profiles_update_own on public.profiles for update to authenticated
   using (id = auth.uid()) with check (id = auth.uid());
 
 -- CROPS
+drop policy if exists crops_read on public.crops;
 create policy crops_read on public.crops for select to anon, authenticated using (is_active);
 
 -- FARMS
+drop policy if exists farms_select_own on public.farms;
 create policy farms_select_own on public.farms for select to authenticated using (user_id = auth.uid());
+
+drop policy if exists farms_insert_own on public.farms;
 create policy farms_insert_own on public.farms for insert to authenticated with check (user_id = auth.uid());
+
+drop policy if exists farms_update_own on public.farms;
 create policy farms_update_own on public.farms for update to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+drop policy if exists farms_delete_own on public.farms;
 create policy farms_delete_own on public.farms for delete to authenticated using (user_id = auth.uid());
 
 -- HELPER
@@ -325,64 +402,114 @@ create or replace function public.owns_farm(fid uuid)
 returns boolean language sql stable security invoker as $$
   select exists (select 1 from public.farms f where f.id = fid and f.user_id = auth.uid());
 $$;
+grant execute on function public.owns_farm(uuid) to authenticated, anon;
 
 -- ADVISORIES
+drop policy if exists adv_select on public.crop_advisories;
 create policy adv_select on public.crop_advisories for select to authenticated using (user_id = auth.uid());
+
+drop policy if exists adv_insert on public.crop_advisories;
 create policy adv_insert on public.crop_advisories for insert to authenticated
   with check (user_id = auth.uid() and public.owns_farm(farm_id));
+
+drop policy if exists adv_delete on public.crop_advisories;
 create policy adv_delete on public.crop_advisories for delete to authenticated using (user_id = auth.uid());
 
 -- RECOMMENDATIONS
+drop policy if exists rec_select on public.crop_recommendations;
 create policy rec_select on public.crop_recommendations for select to authenticated using (user_id = auth.uid());
+
+drop policy if exists rec_insert on public.crop_recommendations;
 create policy rec_insert on public.crop_recommendations for insert to authenticated
   with check (user_id = auth.uid() and public.owns_farm(farm_id));
+
+drop policy if exists rec_delete on public.crop_recommendations;
 create policy rec_delete on public.crop_recommendations for delete to authenticated using (user_id = auth.uid());
 
 -- DIAGNOSES
+drop policy if exists diag_select on public.pest_diagnoses;
 create policy diag_select on public.pest_diagnoses for select to authenticated using (user_id = auth.uid());
+
+drop policy if exists diag_insert on public.pest_diagnoses;
 create policy diag_insert on public.pest_diagnoses for insert to authenticated
   with check (user_id = auth.uid() and (farm_id is null or public.owns_farm(farm_id)));
+
+drop policy if exists diag_delete on public.pest_diagnoses;
 create policy diag_delete on public.pest_diagnoses for delete to authenticated using (user_id = auth.uid());
 
+drop policy if exists diagimg_select on public.diagnosis_images;
 create policy diagimg_select on public.diagnosis_images for select to authenticated using (user_id = auth.uid());
+
+drop policy if exists diagimg_insert on public.diagnosis_images;
 create policy diagimg_insert on public.diagnosis_images for insert to authenticated
   with check (user_id = auth.uid() and exists (
     select 1 from public.pest_diagnoses d where d.id = diagnosis_id and d.user_id = auth.uid()));
+
+drop policy if exists diagimg_delete on public.diagnosis_images;
 create policy diagimg_delete on public.diagnosis_images for delete to authenticated using (user_id = auth.uid());
 
 -- FERTILIZER PLANS
+drop policy if exists fert_select on public.fertilizer_plans;
 create policy fert_select on public.fertilizer_plans for select to authenticated using (user_id = auth.uid());
+
+drop policy if exists fert_insert on public.fertilizer_plans;
 create policy fert_insert on public.fertilizer_plans for insert to authenticated
   with check (user_id = auth.uid() and public.owns_farm(farm_id));
+
+drop policy if exists fert_delete on public.fertilizer_plans;
 create policy fert_delete on public.fertilizer_plans for delete to authenticated using (user_id = auth.uid());
 
 -- CHAT
+drop policy if exists cs_all_own on public.chat_sessions;
 create policy cs_all_own on public.chat_sessions for all to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid() and (farm_id is null or public.owns_farm(farm_id)));
+
+drop policy if exists cm_select on public.chat_messages;
 create policy cm_select on public.chat_messages for select to authenticated using (user_id = auth.uid());
+
+drop policy if exists cm_insert on public.chat_messages;
 create policy cm_insert on public.chat_messages for insert to authenticated
   with check (user_id = auth.uid() and exists (
     select 1 from public.chat_sessions s where s.id = session_id and s.user_id = auth.uid()));
 
 -- FEEDBACK
+drop policy if exists fb_all_own on public.feedback;
 create policy fb_all_own on public.feedback for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- AI USAGE LOGS
+drop policy if exists ai_logs_select_own on public.ai_usage_logs;
 create policy ai_logs_select_own on public.ai_usage_logs for select to authenticated using (user_id = auth.uid());
 
 -- STORAGE RLS
-create policy "crop_images_read_own" on storage.objects for select to authenticated
-  using (bucket_id = 'crop-images' and (storage.foldername(name))[1] = auth.uid()::text);
-create policy "crop_images_insert_own" on storage.objects for insert to authenticated
-  with check (bucket_id = 'crop-images' and (storage.foldername(name))[1] = auth.uid()::text);
-create policy "crop_images_delete_own" on storage.objects for delete to authenticated
-  using (bucket_id = 'crop-images' and (storage.foldername(name))[1] = auth.uid()::text);
+do $$ begin
+  drop policy if exists "crop_images_read_own" on storage.objects;
+  create policy "crop_images_read_own" on storage.objects for select to authenticated
+    using (bucket_id = 'crop-images' and (storage.foldername(name))[1] = auth.uid()::text);
+exception when others then null;
+end $$;
+
+do $$ begin
+  drop policy if exists "crop_images_insert_own" on storage.objects;
+  create policy "crop_images_insert_own" on storage.objects for insert to authenticated
+    with check (bucket_id = 'crop-images' and (storage.foldername(name))[1] = auth.uid()::text);
+exception when others then null;
+end $$;
+
+do $$ begin
+  drop policy if exists "crop_images_delete_own" on storage.objects;
+  create policy "crop_images_delete_own" on storage.objects for delete to authenticated
+    using (bucket_id = 'crop-images' and (storage.foldername(name))[1] = auth.uid()::text);
+exception when others then null;
+end $$;
 
 -- GRANTS
-revoke all on all tables in schema public from anon;
-grant select on public.crops to anon;
+grant usage on schema public to anon, authenticated;
+grant select on public.crops to anon, authenticated;
+grant all on all tables in schema public to authenticated;
+grant all on all sequences in schema public to authenticated;
+grant all on all routines in schema public to authenticated;
 
 -- =====================================================================
 -- SEED DATA (42 Crops Catalog)
@@ -390,7 +517,7 @@ grant select on public.crops to anon;
 insert into public.crops (
   name_en, name_hi, scientific_name, category, seasons, duration_days_min, duration_days_max, growth_stages, water_requirement, npk_recommendation_kg_ha
 ) values
-('Paddy (Rice)', 'धान (चावल)', 'Oryza sativa', 'cereal', array['kharif','rabi']::season[], 110, 150, '[{"key": "germination", "label_en": "Germination & Seedling", "day_start": 0, "day_end": 20},{"key": "tillering", "label_en": "Tillering", "day_start": 21, "day_end": 45},{"key": "panicle_initiation", "label_en": "Panicle Initiation & Stem Elongation", "day_start": 46, "day_end": 75},{"key": "flowering", "label_en": "Booting & Flowering", "day_start": 76, "day_end": 95},{"key": "grain_filling", "label_en": "Milk & Dough Stage", "day_start": 96, "day_end": 120},{"key": "maturity", "label_en": "Maturity & Harvest", "day_start": 121, "day_end": 150}]'::jsonb, 'high', '{"N": 120, "P2O5": 60, "K2O": 40}'::jsonb),
+('Paddy (Rice)', 'धान (चावल)', 'Oryza sativa', 'cereal', array['kharif','rabi']::season[], 110, 150, '[{"key": "germination", "label_en": "Germination & Seedling", "day_start": 0, "day_end": 20},{"key": "tillering", "label_en": "Tillering", "day_start": 21, "day_end": 45},{"key": "panicle_initiation", "label_en": "Panicle Initiation & Stem Elongation", "day_start": 46, "day_end": 75},{"key": "flowering", "label_en": "Booting & Flowering", "day_start": 76, "day_end": 95},{"key": "grain_filling", "label_en": "Milk & Dough Stage", "day_start": 96, "day_end": 120},{"key": "maturity", "label_en": "Maturity & Harvest", "day_start": 121, "day_end": 150}]'::jsonb, 'adequate', '{"N": 120, "P2O5": 60, "K2O": 40}'::jsonb),
 ('Wheat', 'गेहूं', 'Triticum aestivum', 'cereal', array['rabi']::season[], 115, 140, '[{"key": "crown_root_initiation", "label_en": "Crown Root Initiation (CRI)", "day_start": 0, "day_end": 25},{"key": "tillering", "label_en": "Tillering", "day_start": 26, "day_end": 45},{"key": "jointing", "label_en": "Jointing", "day_start": 46, "day_end": 65},{"key": "booting_heading", "label_en": "Booting & Heading", "day_start": 66, "day_end": 85},{"key": "grain_milking", "label_en": "Milk & Dough Grain Filling", "day_start": 86, "day_end": 115},{"key": "maturity", "label_en": "Maturity & Ripening", "day_start": 116, "day_end": 140}]'::jsonb, 'moderate', '{"N": 120, "P2O5": 60, "K2O": 40}'::jsonb),
 ('Maize', 'मक्का', 'Zea mays', 'cereal', array['kharif','rabi','zaid']::season[], 90, 120, '[{"key": "emergence", "label_en": "Emergence & Seedling (V2-V4)", "day_start": 0, "day_end": 20},{"key": "knee_high", "label_en": "Knee High (V6-V8)", "day_start": 21, "day_end": 40},{"key": "tasseling_silking", "label_en": "Tasseling & Silking", "day_start": 41, "day_end": 65},{"key": "grain_filling", "label_en": "Blister & Dough Stage", "day_start": 66, "day_end": 90},{"key": "physiological_maturity", "label_en": "Physiological Maturity", "day_start": 91, "day_end": 120}]'::jsonb, 'moderate', '{"N": 120, "P2O5": 60, "K2O": 50}'::jsonb),
 ('Sorghum (Jowar)', 'ज्वार', 'Sorghum bicolor', 'cereal', array['kharif','rabi']::season[], 95, 125, '[{"key": "seedling", "label_en": "Seedling Establishment", "day_start": 0, "day_end": 20},{"key": "vegetative", "label_en": "Vegetative Growth", "day_start": 21, "day_end": 45},{"key": "booting_flowering", "label_en": "Booting & Flowering", "day_start": 46, "day_end": 70},{"key": "grain_filling", "label_en": "Grain Development", "day_start": 71, "day_end": 95},{"key": "maturity", "label_en": "Harvest Maturity", "day_start": 96, "day_end": 125}]'::jsonb, 'scarce', '{"N": 80, "P2O5": 40, "K2O": 40}'::jsonb),
@@ -407,8 +534,8 @@ insert into public.crops (
 ('Sunflower', 'सूरजमुखी', 'Helianthus annuus', 'oilseed', array['kharif','rabi','zaid']::season[], 85, 100, '[{"key": "seedling", "label_en": "Emergence & Seedling", "day_start": 0, "day_end": 20},{"key": "vegetative", "label_en": "Stem & Foliage Development", "day_start": 21, "day_end": 40},{"key": "star_bud_flowering", "label_en": "Star Bud & Flowering (Anthesis)", "day_start": 41, "day_end": 65},{"key": "seed_filling", "label_en": "Achene (Seed) Filling", "day_start": 66, "day_end": 85},{"key": "maturity", "label_en": "Harvest Maturity", "day_start": 86, "day_end": 100}]'::jsonb, 'moderate', '{"N": 60, "P2O5": 60, "K2O": 40}'::jsonb),
 ('Sesame', 'तिल', 'Sesamum indicum', 'oilseed', array['kharif','zaid']::season[], 80, 95, '[{"key": "seedling", "label_en": "Seedling", "day_start": 0, "day_end": 20},{"key": "vegetative", "label_en": "Branching & Leaf Growth", "day_start": 21, "day_end": 40},{"key": "flowering", "label_en": "Flowering & Capsule Initiation", "day_start": 41, "day_end": 65},{"key": "capsule_maturation", "label_en": "Capsule Maturation", "day_start": 66, "day_end": 80},{"key": "maturity", "label_en": "Harvesting", "day_start": 81, "day_end": 95}]'::jsonb, 'scarce', '{"N": 40, "P2O5": 30, "K2O": 20}'::jsonb),
 ('Cotton', 'कपास', 'Gossypium hirsutum', 'fibre', array['kharif']::season[], 150, 180, '[{"key": "seedling", "label_en": "Germination & Seedling", "day_start": 0, "day_end": 30},{"key": "squaring", "label_en": "Vegetative & Squaring (Square Formation)", "day_start": 31, "day_end": 65},{"key": "flowering_boll", "label_en": "Flowering & Early Boll Setting", "day_start": 66, "day_end": 105},{"key": "boll_development", "label_en": "Boll Development & Maturation", "day_start": 106, "day_end": 140},{"key": "boll_bursting", "label_en": "Boll Bursting & Picking", "day_start": 141, "day_end": 180}]'::jsonb, 'moderate', '{"N": 120, "P2O5": 60, "K2O": 60}'::jsonb),
-('Jute', 'जूट / पटसन', 'Corchorus olitorius', 'fibre', array['kharif','zaid']::season[], 110, 135, '[{"key": "seedling", "label_en": "Seedling", "day_start": 0, "day_end": 25},{"key": "vegetative", "label_en": "Active Vegetative & Fibre Elongation", "day_start": 26, "day_end": 80},{"key": "small_pod", "label_en": "Small Pod / Pre-Flowering", "day_start": 81, "day_end": 110},{"key": "maturity_harvest", "label_en": "Harvest (Optimal Fibre Quality)", "day_start": 111, "day_end": 135}]'::jsonb, 'high', '{"N": 60, "P2O5": 30, "K2O": 30}'::jsonb),
-('Sugarcane', 'गन्ना', 'Saccharum officinarum', 'sugar', array['perennial']::season[], 300, 365, '[{"key": "germination", "label_en": "Germination Phase", "day_start": 0, "day_end": 45},{"key": "formative", "label_en": "Formative & Tillering Phase", "day_start": 46, "day_end": 120},{"key": "grand_growth", "label_en": "Grand Growth Phase (Cane Elongation)", "day_start": 121, "day_end": 250},{"key": "ripening", "label_en": "Ripening & Sugar Accumulation", "day_start": 251, "day_end": 365}]'::jsonb, 'high', '{"N": 250, "P2O5": 100, "K2O": 120}'::jsonb),
+('Jute', 'जूट / पटसन', 'Corchorus olitorius', 'fibre', array['kharif','zaid']::season[], 110, 135, '[{"key": "seedling", "label_en": "Seedling", "day_start": 0, "day_end": 25},{"key": "vegetative", "label_en": "Active Vegetative & Fibre Elongation", "day_start": 26, "day_end": 80},{"key": "small_pod", "label_en": "Small Pod / Pre-Flowering", "day_start": 81, "day_end": 110},{"key": "maturity_harvest", "label_en": "Harvest (Optimal Fibre Quality)", "day_start": 111, "day_end": 135}]'::jsonb, 'adequate', '{"N": 60, "P2O5": 30, "K2O": 30}'::jsonb),
+('Sugarcane', 'गन्ना', 'Saccharum officinarum', 'sugar', array['perennial']::season[], 300, 365, '[{"key": "germination", "label_en": "Germination Phase", "day_start": 0, "day_end": 45},{"key": "formative", "label_en": "Formative & Tillering Phase", "day_start": 46, "day_end": 120},{"key": "grand_growth", "label_en": "Grand Growth Phase (Cane Elongation)", "day_start": 121, "day_end": 250},{"key": "ripening", "label_en": "Ripening & Sugar Accumulation", "day_start": 251, "day_end": 365}]'::jsonb, 'adequate', '{"N": 250, "P2O5": 100, "K2O": 120}'::jsonb),
 ('Tomato', 'टमाटर', 'Solanum lycopersicum', 'vegetable', array['kharif','rabi','zaid']::season[], 90, 130, '[{"key": "nursery_transplanting", "label_en": "Nursery & Transplanting", "day_start": 0, "day_end": 25},{"key": "vegetative", "label_en": "Early Vegetative Growth", "day_start": 26, "day_end": 45},{"key": "flowering_fruit_set", "label_en": "Flowering & Fruit Setting", "day_start": 46, "day_end": 75},{"key": "fruit_development", "label_en": "Fruit Enlargement", "day_start": 76, "day_end": 100},{"key": "harvesting", "label_en": "Fruit Ripening & Multiple Pickings", "day_start": 101, "day_end": 130}]'::jsonb, 'moderate', '{"N": 100, "P2O5": 60, "K2O": 60}'::jsonb),
 ('Potato', 'आलू', 'Solanum tuberosum', 'vegetable', array['rabi']::season[], 90, 120, '[{"key": "sprouting", "label_en": "Sprout Emergence", "day_start": 0, "day_end": 20},{"key": "vegetative", "label_en": "Vegetative & Canopy Growth", "day_start": 21, "day_end": 45},{"key": "tuber_initiation", "label_en": "Tuber Initiation", "day_start": 46, "day_end": 65},{"key": "tuber_bulking", "label_en": "Tuber Bulking", "day_start": 66, "day_end": 95},{"key": "maturity", "label_en": "Maturity & Skin Hardening", "day_start": 96, "day_end": 120}]'::jsonb, 'moderate', '{"N": 150, "P2O5": 100, "K2O": 120}'::jsonb),
 ('Onion', 'प्याज', 'Allium cepa', 'vegetable', array['kharif','rabi']::season[], 120, 150, '[{"key": "nursery_seedling", "label_en": "Nursery & Transplanting", "day_start": 0, "day_end": 45},{"key": "vegetative", "label_en": "Vegetative Leaf Growth", "day_start": 46, "day_end": 80},{"key": "bulb_initiation", "label_en": "Bulb Initiation & Development", "day_start": 81, "day_end": 115},{"key": "maturity_harvest", "label_en": "Neck Fall & Harvest Maturity", "day_start": 116, "day_end": 150}]'::jsonb, 'moderate', '{"N": 100, "P2O5": 50, "K2O": 80}'::jsonb),
@@ -418,15 +545,15 @@ insert into public.crops (
 ('Cabbage', 'पत्तागोभी', 'Brassica oleracea var. capitata', 'vegetable', array['rabi']::season[], 85, 110, '[{"key": "nursery", "label_en": "Nursery & Transplanting", "day_start": 0, "day_end": 25},{"key": "vegetative", "label_en": "Vegetative & Foliage Development", "day_start": 26, "day_end": 50},{"key": "head_formation", "label_en": "Head Formation & Cupping", "day_start": 51, "day_end": 80},{"key": "maturity", "label_en": "Head Firmness & Harvest", "day_start": 81, "day_end": 110}]'::jsonb, 'moderate', '{"N": 120, "P2O5": 60, "K2O": 60}'::jsonb),
 ('Cauliflower', 'फूलगोभी', 'Brassica oleracea var. botrytis', 'vegetable', array['rabi']::season[], 85, 115, '[{"key": "nursery", "label_en": "Nursery & Transplanting", "day_start": 0, "day_end": 28},{"key": "vegetative", "label_en": "Vegetative Growth", "day_start": 29, "day_end": 55},{"key": "curd_initiation", "label_en": "Curd Initiation & Blanching", "day_start": 56, "day_end": 85},{"key": "maturity", "label_en": "Curd Harvest", "day_start": 86, "day_end": 115}]'::jsonb, 'moderate', '{"N": 120, "P2O5": 80, "K2O": 60}'::jsonb),
 ('Cucumber', 'खीरा', 'Cucumis sativus', 'vegetable', array['zaid','kharif']::season[], 60, 80, '[{"key": "seedling", "label_en": "Emergence & Seedling", "day_start": 0, "day_end": 15},{"key": "vining", "label_en": "Vine Growth & Trellising", "day_start": 16, "day_end": 35},{"key": "flowering_fruit_set", "label_en": "Flowering & Fruit Setting", "day_start": 36, "day_end": 50},{"key": "harvesting", "label_en": "Fruit Picking", "day_start": 51, "day_end": 80}]'::jsonb, 'moderate', '{"N": 80, "P2O5": 50, "K2O": 50}'::jsonb),
-('Banana', 'केला', 'Musa acuminata', 'fruit', array['perennial']::season[], 300, 365, '[{"key": "establishment", "label_en": "Sucker / Plantlet Establishment", "day_start": 0, "day_end": 90},{"key": "vegetative", "label_en": "Active Vegetative (Shooting Phase)", "day_start": 91, "day_end": 210},{"key": "flowering_shooting", "label_en": "Inflorescence & Bunch Emergence", "day_start": 211, "day_end": 270},{"key": "bunch_development", "label_en": "Bunch Maturation & Harvest", "day_start": 271, "day_end": 365}]'::jsonb, 'high', '{"N": 200, "P2O5": 60, "K2O": 300}'::jsonb),
+('Banana', 'केला', 'Musa acuminata', 'fruit', array['perennial']::season[], 300, 365, '[{"key": "establishment", "label_en": "Sucker / Plantlet Establishment", "day_start": 0, "day_end": 90},{"key": "vegetative", "label_en": "Active Vegetative (Shooting Phase)", "day_start": 91, "day_end": 210},{"key": "flowering_shooting", "label_en": "Inflorescence & Bunch Emergence", "day_start": 211, "day_end": 270},{"key": "bunch_development", "label_en": "Bunch Maturation & Harvest", "day_start": 271, "day_end": 365}]'::jsonb, 'adequate', '{"N": 200, "P2O5": 60, "K2O": 300}'::jsonb),
 ('Mango', 'आम', 'Mangifera indica', 'fruit', array['perennial']::season[], 365, 365, '[{"key": "dormancy", "label_en": "Post-Monsoon Dormancy", "day_start": 0, "day_end": 60},{"key": "panicle_bloom", "label_en": "Panicle Emergence & Flowering", "day_start": 61, "day_end": 120},{"key": "fruit_set", "label_en": "Fruit Setting & Pea/Marble Stage", "day_start": 121, "day_end": 180},{"key": "fruit_development", "label_en": "Fruit Enlargement & Maturation", "day_start": 181, "day_end": 270},{"key": "harvest", "label_en": "Harvesting & Post-Harvest Flush", "day_start": 271, "day_end": 365}]'::jsonb, 'moderate', '{"N": 100, "P2O5": 50, "K2O": 100}'::jsonb),
-('Papaya', 'पपीता', 'Carica papaya', 'fruit', array['perennial']::season[], 240, 330, '[{"key": "nursery_establishment", "label_en": "Transplanting & Establishment", "day_start": 0, "day_end": 45},{"key": "vegetative", "label_en": "Rapid Vegetative Growth", "day_start": 46, "day_end": 105},{"key": "flowering_fruiting", "label_en": "Flowering & Fruit Setting", "day_start": 106, "day_end": 180},{"key": "fruit_maturation", "label_en": "Fruit Development & Harvest", "day_start": 181, "day_end": 330}]'::jsonb, 'high', '{"N": 150, "P2O5": 150, "K2O": 200}'::jsonb),
+('Papaya', 'पपीता', 'Carica papaya', 'fruit', array['perennial']::season[], 240, 330, '[{"key": "nursery_establishment", "label_en": "Transplanting & Establishment", "day_start": 0, "day_end": 45},{"key": "vegetative", "label_en": "Rapid Vegetative Growth", "day_start": 46, "day_end": 105},{"key": "flowering_fruiting", "label_en": "Flowering & Fruit Setting", "day_start": 106, "day_end": 180},{"key": "fruit_maturation", "label_en": "Fruit Development & Harvest", "day_start": 181, "day_end": 330}]'::jsonb, 'adequate', '{"N": 150, "P2O5": 150, "K2O": 200}'::jsonb),
 ('Pomegranate', 'अनार', 'Punica granatum', 'fruit', array['perennial']::season[], 300, 365, '[{"key": "defoliation_bahar", "label_en": "Bahar Treatment & Pruning", "day_start": 0, "day_end": 30},{"key": "flowering", "label_en": "Flushing & Flowering", "day_start": 31, "day_end": 90},{"key": "fruit_development", "label_en": "Fruit Setting & Growth", "day_start": 91, "day_end": 210},{"key": "maturity", "label_en": "Fruit Maturation & Coloration", "day_start": 211, "day_end": 365}]'::jsonb, 'moderate', '{"N": 125, "P2O5": 50, "K2O": 125}'::jsonb),
 ('Grapes', 'अंगूर', 'Vitis vinifera', 'fruit', array['perennial']::season[], 300, 365, '[{"key": "pruning_bud_burst", "label_en": "Foundation/Fruit Pruning & Bud Burst", "day_start": 0, "day_end": 40},{"key": "shoot_bloom", "label_en": "Shoot Elongation & Flowering", "day_start": 41, "day_end": 90},{"key": "berry_setting", "label_en": "Berry Setting & Thinning", "day_start": 91, "day_end": 140},{"key": "veraison", "label_en": "Veraison (Berry Softening & Color)", "day_start": 141, "day_end": 200},{"key": "harvest", "label_en": "Harvesting", "day_start": 201, "day_end": 365}]'::jsonb, 'moderate', '{"N": 150, "P2O5": 80, "K2O": 200}'::jsonb),
-('Coconut', 'नारियल', 'Cocos nucifera', 'plantation', array['perennial']::season[], 365, 365, '[{"key": "inflorescence", "label_en": "Spathe Opening & Button Setting", "day_start": 0, "day_end": 90},{"key": "nut_development", "label_en": "Tender Nut Phase", "day_start": 91, "day_end": 240},{"key": "kernel_maturation", "label_en": "Copra & Shell Hardening", "day_start": 241, "day_end": 365}]'::jsonb, 'high', '{"N": 100, "P2O5": 50, "K2O": 150}'::jsonb),
-('Arecanut', 'सुपारी', 'Areca catechu', 'plantation', array['perennial']::season[], 365, 365, '[{"key": "spathe_opening", "label_en": "Spathe Opening & Pollination", "day_start": 0, "day_end": 80},{"key": "nut_setting", "label_en": "Nut Setting & Growth", "day_start": 81, "day_end": 220},{"key": "harvest", "label_en": "Nut Maturation & Harvesting", "day_start": 221, "day_end": 365}]'::jsonb, 'high', '{"N": 100, "P2O5": 40, "K2O": 140}'::jsonb),
+('Coconut', 'नारियल', 'Cocos nucifera', 'plantation', array['perennial']::season[], 365, 365, '[{"key": "inflorescence", "label_en": "Spathe Opening & Button Setting", "day_start": 0, "day_end": 90},{"key": "nut_development", "label_en": "Tender Nut Phase", "day_start": 91, "day_end": 240},{"key": "kernel_maturation", "label_en": "Copra & Shell Hardening", "day_start": 241, "day_end": 365}]'::jsonb, 'adequate', '{"N": 100, "P2O5": 50, "K2O": 150}'::jsonb),
+('Arecanut', 'सुपारी', 'Areca catechu', 'plantation', array['perennial']::season[], 365, 365, '[{"key": "spathe_opening", "label_en": "Spathe Opening & Pollination", "day_start": 0, "day_end": 80},{"key": "nut_setting", "label_en": "Nut Setting & Growth", "day_start": 81, "day_end": 220},{"key": "harvest", "label_en": "Nut Maturation & Harvesting", "day_start": 221, "day_end": 365}]'::jsonb, 'adequate', '{"N": 100, "P2O5": 40, "K2O": 140}'::jsonb),
 ('Coffee', 'कॉफ़ी', 'Coffea arabica', 'plantation', array['perennial']::season[], 300, 365, '[{"key": "blossom", "label_en": "Blossom & Backing Shower", "day_start": 0, "day_end": 45},{"key": "berry_development", "label_en": "Berry Expansion & Bean Filling", "day_start": 46, "day_end": 200},{"key": "ripening_picking", "label_en": "Ripening & Fly Picking", "day_start": 201, "day_end": 365}]'::jsonb, 'moderate', '{"N": 120, "P2O5": 90, "K2O": 120}'::jsonb),
-('Tea', 'चाय', 'Camellia sinensis', 'plantation', array['perennial']::season[], 300, 365, '[{"key": "dormancy_pruning", "label_en": "Dormancy & Pruning", "day_start": 0, "day_end": 60},{"key": "first_flush", "label_en": "First Flush (Early Spring Plucking)", "day_start": 61, "day_end": 140},{"key": "monsoon_flush", "label_en": "Monsoon Flush & Active Foliage", "day_start": 141, "day_end": 250},{"key": "autumn_flush", "label_en": "Autumn Flush Plucking", "day_start": 251, "day_end": 365}]'::jsonb, 'high', '{"N": 140, "P2O5": 40, "K2O": 80}'::jsonb),
+('Tea', 'चाय', 'Camellia sinensis', 'plantation', array['perennial']::season[], 300, 365, '[{"key": "dormancy_pruning", "label_en": "Dormancy & Pruning", "day_start": 0, "day_end": 60},{"key": "first_flush", "label_en": "First Flush (Early Spring Plucking)", "day_start": 61, "day_end": 140},{"key": "monsoon_flush", "label_en": "Monsoon Flush & Active Foliage", "day_start": 141, "day_end": 250},{"key": "autumn_flush", "label_en": "Autumn Flush Plucking", "day_start": 251, "day_end": 365}]'::jsonb, 'adequate', '{"N": 140, "P2O5": 40, "K2O": 80}'::jsonb),
 ('Turmeric', 'हल्दी', 'Curcuma longa', 'spice', array['kharif']::season[], 240, 270, '[{"key": "sprouting", "label_en": "Rhizome Sprouting", "day_start": 0, "day_end": 30},{"key": "vegetative", "label_en": "Tillering & Leaf Development", "day_start": 31, "day_end": 90},{"key": "rhizome_development", "label_en": "Rhizome Bulking", "day_start": 91, "day_end": 180},{"key": "maturity", "label_en": "Leaf Senescence & Harvest", "day_start": 181, "day_end": 270}]'::jsonb, 'moderate', '{"N": 120, "P2O5": 60, "K2O": 120}'::jsonb),
 ('Ginger', 'अदरक', 'Zingiber officinale', 'spice', array['kharif']::season[], 210, 240, '[{"key": "sprouting", "label_en": "Sprouting & Establishment", "day_start": 0, "day_end": 35},{"key": "tillering", "label_en": "Tillering & Canopy Growth", "day_start": 36, "day_end": 95},{"key": "rhizome_bulking", "label_en": "Rhizome Enlargement", "day_start": 96, "day_end": 175},{"key": "maturity", "label_en": "Maturity & Harvesting", "day_start": 176, "day_end": 240}]'::jsonb, 'moderate', '{"N": 100, "P2O5": 50, "K2O": 80}'::jsonb),
 ('Garlic', 'लहसुन', 'Allium sativum', 'spice', array['rabi']::season[], 120, 150, '[{"key": "germination", "label_en": "Clove Sprouting", "day_start": 0, "day_end": 20},{"key": "vegetative", "label_en": "Vegetative Foliage Growth", "day_start": 21, "day_end": 60},{"key": "clove_initiation", "label_en": "Clove Initiation & Bulb Growth", "day_start": 61, "day_end": 105},{"key": "maturity", "label_en": "Maturity & Drying", "day_start": 106, "day_end": 150}]'::jsonb, 'moderate', '{"N": 100, "P2O5": 50, "K2O": 50}'::jsonb),
